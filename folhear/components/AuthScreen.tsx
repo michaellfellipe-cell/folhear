@@ -1,6 +1,6 @@
 'use client'
 import { useState } from 'react'
-import { createClient } from '@/lib/supabase'
+import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 
 const C = {
@@ -25,7 +25,6 @@ export default function AuthScreen() {
     }
     setLoading(true)
     try {
-      const supabase = createClient()
       if (mode === 'signup') {
         if (!form.firstName.trim()) { setError('Informe seu nome.'); setLoading(false); return }
         const { error } = await supabase.auth.signUp({
