@@ -532,7 +532,7 @@ function ShelfTab({library,onRate,onUpdLib,onAddToWish,aiAnalysis,onRefreshAi}:{
   )
 }
 
-function DiscoverTab({t,lang}:{t:(k:string)=>string;lang:Lang}) {
+function DiscoverTab({t,lang}:{t:(k:string)=>string;lang:'pt'|'en'}) {
   const [q,setQ]=useState('')
   const [res,setRes]=useState('')
   const [loading,setLoading]=useState(false)
