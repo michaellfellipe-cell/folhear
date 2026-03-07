@@ -16,7 +16,7 @@ const TR: Record<string, Record<string, string>> = {
     completed:'Concluído',inProgress:'Em andamento',monthlyChallenge:'Desafio Mensal',
     globalChallenge:'Desafio Global',bookAdded:'Livro adicionado!',profileSaved:'Perfil salvo!',
     editProfile:'Editar perfil',timelineEmpty:'Sua jornada literária começa quando você concluir o primeiro livro.',
-    noActivity:'Nenhuma atividade ainda.',lang:'EN',
+    noActivity:'Nenhuma atividade ainda.',lang:'EN',aiPlaceholder:'Pergunte ao Claude: "Me recomende livros de ficcao cientifica"...',aiButton:'Perguntar',aiLoading:'Pensando...',aiError:'Erro ao consultar IA. Tente novamente.',aiWelcome:'Descubra seu proximo livro favorito com Claude.',aiSubtitle:'Pergunte sobre: genero, autor, tema, humor...',
   },
   en: {
     appName:'Folhear',discover:'Discover',shelf:'Shelf',reading:'Reading',timeline:'Timeline',
@@ -30,7 +30,7 @@ const TR: Record<string, Record<string, string>> = {
     completed:'Completed',inProgress:'In progress',monthlyChallenge:'Monthly Challenge',
     globalChallenge:'Global Challenge',bookAdded:'Book added!',profileSaved:'Profile saved!',
     editProfile:'Edit profile',timelineEmpty:'Your literary journey begins when you finish your first book.',
-    noActivity:'No activity yet.',lang:'PT',
+    noActivity:'No activity yet.',lang:'PT',aiPlaceholder:'Ask Claude: "Recommend sci-fi books for beginners"...',aiButton:'Ask',aiLoading:'Thinking...',aiError:'Error querying AI. Please try again.',aiWelcome:'Discover your next favorite book with Claude.',aiSubtitle:'Ask about: genre, author, theme, mood...',
   },
 }
 const LangCtx = createContext({ lang: 'pt', t: TR.pt, toggle: () => {} })
@@ -532,6 +532,63 @@ function ShelfTab({library,onRate,onUpdLib,onAddToWish,aiAnalysis,onRefreshAi}:{
   )
 }
 
+function DiscoverTab({t,lang}:{t:(k:string)=>string;lang:Lang}) {
+  const [q,setQ]=useState('')
+  const [res,setRes]=useState('')
+  const [loading,setLoading]=useState(false)
+  const [err,setErr]=useState('')
+  const [hist,setHist]=useState<{q:string;r:string}[]>([])
+  const ask=useCallback(async()=>{
+    if(!q.trim()||loading)return
+    setLoading(true);setErr('');setRes('')
+    try{
+      const r=await fetch('/api/ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:q,model:'haiku'})})
+      const d=await r.json()
+      if(!r.ok)throw new Error(d.error||'error')
+      const ans=d.result||d.content||d.message||JSON.stringify(d)
+      setRes(ans);setHist(h=>[{q,r:ans},...h.slice(0,4)])
+    }catch(e:any){setErr(t('aiError'))}
+    finally{setLoading(false)}
+  },[q,loading,t])
+  const sug=lang==='pt'?['Me recomende 5 romances brasileiros','Ficção científica para iniciantes','Livros como O Alquimista','Autoconhecimento 2024']:['5 modern novels','Sci-fi for beginners','Books like The Alchemist','Self-help 2024']
+  return(
+    <div style={{padding:'24px',maxWidth:700,fontFamily:"'Cormorant Garamond',serif"}}>
+      <h1 style={{color:C.accent,fontSize:28,fontWeight:300,marginBottom:8}}>📖 {t('discover')}</h1>
+      <p style={{color:C.textDim,fontSize:13,marginBottom:24,fontFamily:'inherit'}}>{lang==='pt'?'Inteligência artificial para leitores':'AI-powered book discovery'}</p>
+      <div style={{background:C.surface,border:'1px solid '+C.accentDim,borderRadius:12,padding:20,marginBottom:16}}>
+        <p style={{color:C.text,marginBottom:4,fontSize:14}}>{t('aiWelcome')}</p>
+        <p style={{color:C.textDim,fontSize:12,marginBottom:14}}>{t('aiSubtitle')}</p>
+        <div style={{position:'relative'}}>
+          <textarea value={q} onChange={e=>setQ(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&(e.metaKey||e.ctrlKey))ask()}} placeholder={t('aiPlaceholder')} style={{width:'100%',minHeight:90,background:C.surface2,border:'1px solid '+C.border,borderRadius:8,padding:'10px 130px 10px 12px',color:C.text,fontSize:13,fontFamily:'inherit',resize:'vertical',boxSizing:'border-box' as any,outline:'none'}} />
+          <button onClick={ask} disabled={loading||!q.trim()} style={{position:'absolute',right:10,bottom:10,padding:'8px 18px',background:C.accent,border:'none',borderRadius:6,color:C.bg,fontWeight:600,fontSize:13,cursor:loading||!q.trim()?'default':'pointer',opacity:loading||!q.trim()?0.5:1}}>{loading?t('aiLoading'):t('aiButton')}</button>
+        </div>
+        <p style={{color:C.textDim,fontSize:11,marginTop:6}}>{lang==='pt'?'Ctrl+Enter para enviar':'Ctrl+Enter to send'}</p>
+      </div>
+      {err&&<div style={{background:'rgba(168,106,106,0.1)',border:'1px solid rgba(168,106,106,0.3)',borderRadius:8,padding:'12px 16px',marginBottom:12,color:C.red,fontSize:13}}>{err}</div>}
+      {loading&&<div style={{background:C.surface,border:'1px solid '+C.border,borderRadius:10,padding:16,display:'flex',alignItems:'center',gap:12,marginBottom:12}}><div style={{width:8,height:8,borderRadius:'50%',background:C.accent}} /><span style={{color:C.textDim,fontStyle:'italic',fontSize:14}}>{t('aiLoading')}</span></div>}
+      {res&&!loading&&<div style={{background:C.surface,border:'1px solid '+C.accentDim,borderRadius:12,padding:20,marginBottom:16}}>
+        <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:12}}><span style={{fontSize:18}}>✨</span><span style={{color:C.accent,fontSize:11,letterSpacing:1,textTransform:'uppercase' as any}}>{lang==='pt'?'Resposta do Claude':"Claude's Response"}</span></div>
+        <div style={{color:C.text,fontSize:14,lineHeight:1.7,whiteSpace:'pre-wrap' as any,borderLeft:'3px solid '+C.accent,paddingLeft:16}}>{res}</div>
+        <div style={{marginTop:14,display:'flex',gap:8}}>
+          <button onClick={()=>{setQ('');setRes('')}} style={{padding:'6px 14px',background:'transparent',border:'1px solid '+C.accentDim,borderRadius:6,color:C.text,cursor:'pointer',fontSize:12}}>{lang==='pt'?'🔄 Nova pergunta':'🔄 New question'}</button>
+          <button onClick={()=>navigator.clipboard?.writeText(res)} style={{padding:'6px 14px',background:'transparent',border:'1px solid '+C.accentDim,borderRadius:6,color:C.text,cursor:'pointer',fontSize:12}}>{lang==='pt'?'📋 Copiar':'📋 Copy'}</button>
+        </div>
+      </div>}
+      {!res&&!loading&&<div style={{marginBottom:16}}>
+        <p style={{color:C.textDim,fontSize:12,marginBottom:10,textTransform:'uppercase' as any,letterSpacing:1}}>{lang==='pt'?'Sugestões':'Suggestions'}</p>
+        <div style={{display:'flex',flexWrap:'wrap' as any,gap:8}}>{sug.map((s,i)=><button key={i} onClick={()=>setQ(s)} style={{padding:'7px 14px',background:C.surface,border:'1px solid '+C.accentDim,borderRadius:20,color:C.text,cursor:'pointer',fontSize:12}}>{s}</button>)}</div>
+      </div>}
+      {hist.length>0&&<div>
+        <p style={{color:C.textDim,fontSize:12,marginBottom:10,textTransform:'uppercase' as any,letterSpacing:1}}>{lang==='pt'?'Histórico':'History'}</p>
+        {hist.map((h,i)=><div key={i} onClick={()=>{setQ(h.q);setRes(h.r)}} style={{background:C.surface,border:'1px solid '+C.border,borderRadius:10,padding:14,marginBottom:8,cursor:'pointer',opacity:i===0?1:0.7}}>
+          <p style={{color:C.accent,fontSize:12,marginBottom:4}}>❓ {h.q}</p>
+          <p style={{color:C.textDim,fontSize:12,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{h.r.substring(0,100)}...</p>
+        </div>)}
+      </div>}
+    </div>
+  )
+}
+
 /* ── Main App ── */
 export default function FolhearApp() {
   const [lang,setLang]=useState('pt')
@@ -710,8 +767,7 @@ export default function FolhearApp() {
             {tab==='shelf'&&<ShelfTab library={library} onRate={rateBook} onUpdLib={updLib} onAddToWish={addToWish} aiAnalysis={aiAnalysis} onRefreshAi={refreshAi}/>}
             {tab==='timeline'&&<TimelineTab finished={finished}/>}
             {tab==='challenges'&&<ChallengesTab challenges={challenges} onComplete={completeChallenge} onJoin={joinChallenge}/>}
-            {tab==='discover'&&<div style={{padding:'80px 24px',textAlign:'center',color:C.textDim,fontFamily:"'Cormorant Garamond',serif",fontSize:20,fontStyle:'italic'}}>{lang==='pt'?'Aba Descobrir — em breve na versão web completa':'Discover tab — coming soon in the full web version'}</div>}
-            {tab==='wishlist'&&<div style={{padding:'48px 24px',maxWidth:920,margin:'0 auto'}}><h2 style={{fontFamily:"'Cormorant Garamond',serif",fontSize:40,fontWeight:300}}>🎯 {t.wishlist}</h2>{wishlist.length===0?<p style={{color:C.muted,fontStyle:'italic',fontFamily:"'Cormorant Garamond',serif",fontSize:17,marginTop:20}}>{lang==='pt'?'Lista vazia':'Empty list'}</p>:<div style={{marginTop:20,display:'flex',flexDirection:'column',gap:1,background:C.border}}>{wishlist.map((b:any,i:number)=><div key={i} style={{background:C.surface,padding:'12px 0',display:'grid',gridTemplateColumns:'56px 1fr',gap:'0 12px',alignItems:'start'}}><Spine title={b.title} author={b.author||''} size={56}/><div><p style={{fontFamily:"'Cormorant Garamond',serif",fontSize:16,marginBottom:2}}>{b.title}</p><p style={{fontSize:10,letterSpacing:'2px',textTransform:'uppercase',color:C.accentDim}}>{b.author}</p><span style={{fontSize:9,letterSpacing:'1.5px',textTransform:'uppercase',color:C.gold,border:`1px solid ${C.gold}`,padding:'2px 7px'}}>{b.priority}</span></div></div>)}</div>}</div>}
+            {tab==='discover'&&<DiscoverTab t={t} lang={lang}/>}
             {tab==='reading'&&<div style={{padding:'48px 24px',maxWidth:920,margin:'0 auto'}}><h2 style={{fontFamily:"'Cormorant Garamond',serif",fontSize:40,fontWeight:300}}>📖 {t.reading}</h2><div style={{marginTop:20,display:'flex',flexDirection:'column',gap:1,background:reading.length?C.border:'transparent'}}>{reading.length===0?<p style={{color:C.muted,fontStyle:'italic',fontFamily:"'Cormorant Garamond',serif",fontSize:17}}>{lang==='pt'?'Nenhum livro em andamento':'No books in progress'}</p>:reading.map((r:any,i:number)=><div key={i} style={{background:C.surface,padding:'14px 16px',display:'flex',gap:14,alignItems:'center'}}><Spine title={r.book.title} author={r.book.author||''} size={54}/><div><p style={{fontFamily:"'Cormorant Garamond',serif",fontSize:17}}>{r.book.title}</p><p style={{fontSize:10,color:C.accentDim,letterSpacing:'1.5px',textTransform:'uppercase',marginTop:3}}>{r.book.author}</p><div style={{marginTop:8,height:4,background:C.border,width:200}}><div style={{height:'100%',background:C.accent,width:`${Math.round(r.pages/Math.max(r.totalPages,1)*100)}%`}}/></div><p style={{fontSize:11,color:C.textDim,marginTop:4}}>{r.pages}/{r.totalPages} pgs · {Math.round(r.pages/Math.max(r.totalPages,1)*100)}%</p></div></div>)}</div></div>}
             {tab==='social'&&<div style={{padding:'48px 24px',maxWidth:920,margin:'0 auto'}}><h2 style={{fontFamily:"'Cormorant Garamond',serif",fontSize:40,fontWeight:300}}>👥 {t.social}</h2><div style={{marginTop:20,background:C.surface,border:`1px solid ${C.border}`,padding:24,maxWidth:400}}><div style={{display:'flex',alignItems:'center',gap:14,marginBottom:16}}><Avatar photo={profile?.photo} name={profile?.firstName||'Leitor'} size={52}/><div><p style={{fontFamily:"'Cormorant Garamond',serif",fontSize:20}}>{profile?.username?`@${profile.username}`:profile?.firstName||'Leitor'}</p><div style={{display:'flex',gap:12,marginTop:4}}><span style={{fontSize:11,color:C.muted}}>{followers.length} {t.followers}</span><span style={{fontSize:11,color:C.muted}}>{following.length} {t.following}</span></div></div></div><Btn full onClick={()=>toast$(lang==='pt'?'Perfil completo em breve!':'Full profile coming soon!')}>✎ {t.editProfile}</Btn></div></div>}
           </div>
